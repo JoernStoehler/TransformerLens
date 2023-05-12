@@ -12,6 +12,7 @@ import re
 from rich import print as rprint
 from datasets.arrow_dataset import Dataset
 from datasets.load import load_dataset
+import datasets
 
 from transformer_lens import FactoredMatrix
 
@@ -221,14 +222,23 @@ def tokenize_and_concatenate(
             tokens = np.concatenate([prefix, tokens], axis=1)
         return {"tokens": tokens}
 
-    tokenized_dataset = dataset.map(
-        tokenize_function,
-        batched=True,
-        num_proc=(num_proc if not streaming else None),
-        remove_columns=[column_name],
-    )
-    tokenized_dataset.set_format(type="torch", columns=["tokens"])
-    return tokenized_dataset
+    if not isinstance(dataset, datasets.IterableDataset):
+        tokenized_dataset = dataset.map(
+            tokenize_function,
+            batched=True,
+            num_proc=num_proc if not streaming else None,
+            remove_columns=[column_name],
+        )
+        tokenized_dataset.set_format(type="torch", columns=["tokens"])
+        return tokenized_dataset
+    else:
+        tokenized_dataset = dataset.map(
+            tokenize_function,
+            batched=True,
+            remove_columns=[column_name],
+        )
+        tokenized_dataset = tokenized_dataset.select_columns(["tokens"]).with_format(type="torch")
+        return tokenized_dataset
 
 
 """ 
